@@ -21,7 +21,3 @@ pip install -r requirements.txt
 2. Adicione os destinatários
 3. Edite o corpo do e-mail
 4. Clique em "Enviar Tudo"
-
-## **Para Criar requirements.txt**
-```bash
-pip freeze > requirements.txt
