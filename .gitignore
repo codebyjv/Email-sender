@@ -1,0 +1,23 @@
+# Arquivos Python
+__pycache__/
+*.py[cod]
+*.pyc
+
+# Configurações e senhas
+config.ini
+*.env
+*.secret
+
+# Arquivos temporários
+*.tmp
+*.log
+
+# IDE/Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Sistema
+.DS_Store
+Thumbs.db
