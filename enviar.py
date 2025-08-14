@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                             QTreeWidget, QTreeWidgetItem, QFileDialog, QMessageBox,
                             QGroupBox, QFormLayout, QToolBar, QTabWidget, QScrollArea)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QTextCursor, QAction, QPalette, QColor
+from PyQt6.QtGui import QTextCursor, QAction, QPalette, QColor, QIcon
 
 
 # Configurações iniciais
@@ -35,6 +35,12 @@ class EmailSenderApp(QMainWindow):
         self.setWindowTitle("Ferramenta de Envio de E-mails em Massa")
         self.resize(1200, 800)
         self.dark_mode = False
+
+        try:
+            icon_path = os.path.join(os.path.dirname(__file__), 'assets', 'icon-email-sender.ico.ico')
+            self.setWindowIcon(QIcon(icon_path))
+        except:
+            self.log("Ícone não encontrado, usando padrão do sistema")
         
         # Estrutura de dados
         self.lista_para_envio = []
@@ -304,7 +310,7 @@ class EmailSenderApp(QMainWindow):
             self.log_text.setStyleSheet("""
                 QTextEdit {
                     background-color: #2d2d2d;
-                    color: #ffffff;
+                    color: #000000;
                     font-family: Consolas, monospace;
                     font-size: 10pt;
                     border: 1px solid #444;
