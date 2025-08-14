@@ -1,0 +1,6 @@
+[EMAIL]
+servidor_smtp = smtp.exemplo.com.br
+porta_smtp = Exemplo: 465
+usuario = email@exemplo.com.br
+assunto = Envio em Massa de E-mails
+
