@@ -1,27 +1,14 @@
-# WL Pesos - Envio de E-mails
+# Email Sender Massivo
 
-Ferramenta desenvolvida para envio de e-mails em massa com anexos personalizados.
+Ferramenta Python para envio de e-mails em massa com anexos.
 
 ## Funcionalidades
-- Envio para múltiplos destinatários
-- Anexos personalizados
-- Editor de template de e-mail
-- Importação de contatos via CSV
+- Envio personalizado
+- Suporte a múltiplos anexos
+- Templates de e-mail
+- Interface gráfica intuitiva
 
-## Requisitos
-- Python 3.8+
-- PyQt6
-
-## Instalação
-```bash
-pip install -r requirements.txt
-
-## Como Usar
-1. Configure o servidor SMTP
-2. Adicione os destinatários
-3. Edite o corpo do e-mail
-4. Clique em "Enviar Tudo"
-
-## **Para Criar requirements.txt**
-```bash
-pip freeze > requirements.txt
+## Configuração
+1. Renomeie `.env.example` para `.env`
+2. Preencha suas credenciais SMTP
+3. Execute `python email_sender.py`

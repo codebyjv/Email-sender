@@ -1,3 +1,7 @@
+import os
+from dotenv import load_dotenv
+from pathlib import Path
+
 import csv
 import sys
 import threading
@@ -15,26 +19,34 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                             QTreeWidget, QTreeWidgetItem, QFileDialog, QMessageBox,
                             QGroupBox, QFormLayout, QToolBar, QTabWidget, QScrollArea)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QTextCursor, QAction
+from PyQt6.QtGui import QTextCursor, QAction, QPalette, QColor
+
+
+# Configurações iniciais
+DEFAULT_CONFIG = {
+    'smtp_server': 'smtp.gmail.com',
+    'smtp_port': '587',
+    'email_subject': 'Documentos Importantes'
+}
 
 class EmailSenderApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("WL Pesos - Envio de E-mails Personalizados")
+        self.setWindowTitle("Ferramenta de Envio de E-mails em Massa")
         self.resize(1200, 800)
+        self.dark_mode = False
         
         # Estrutura de dados
         self.lista_para_envio = []
         self.anexos_selecionados = []
-        self.caminho_certificados = "W:/Certificados/PDF"
-        self.caminho_manual = "X:/Manual de Uso/manual.pdf"
+        self.attachments_dir = str(Path.home() / "Documents")  # Pasta padrão
         
         self.init_ui()
         self.load_config()
         
     def init_ui(self):
         # Configuração principal da janela
-        self.setWindowTitle("WL Pesos - Envio de E-mails Personalizados")
+        self.setWindowTitle("Ferramenta de Envio de E-mails em Massa")
         self.resize(1400, 900)
         
         # Layout principal (dividido em esquerda e direita)
@@ -67,9 +79,9 @@ class EmailSenderApp(QMainWindow):
         btn_layout = QHBoxLayout(btn_frame)
         btn_layout.setContentsMargins(0, 0, 0, 0)
         
-        btn_manual = QPushButton("Adicionar Manual")
-        btn_manual.setStyleSheet("background-color: #673AB7; color: white;")
-        btn_manual.clicked.connect(self.selecionar_manual)
+        btn_adicionar_anexos = QPushButton("Adicionar Anexos")
+        btn_adicionar_anexos.setStyleSheet("background-color: #673AB7; color: white;")
+        btn_adicionar_anexos.clicked.connect(self.selecionar_arquivos)
         
         btn_importar = QPushButton("Importar CSV")
         btn_importar.setStyleSheet("background-color: #FF9800; color: white;")
@@ -79,7 +91,7 @@ class EmailSenderApp(QMainWindow):
         btn_adicionar.setStyleSheet("background-color: #4CAF50; color: white;")
         btn_adicionar.clicked.connect(self.adicionar_destinatario)
         
-        btn_layout.addWidget(btn_manual)
+        btn_layout.addWidget(btn_adicionar_anexos)
         btn_layout.addWidget(btn_importar)
         btn_layout.addWidget(btn_adicionar)
         
@@ -114,10 +126,33 @@ class EmailSenderApp(QMainWindow):
         config_layout.addRow(btn_save_config)
         
         config_group.setLayout(config_layout)
+
+        # Seção 3: Preferências
+        pref_group = QGroupBox("Preferências")
+        pref_group.setStyleSheet("QGroupBox { font-weight: bold; }")
+        pref_layout = QVBoxLayout()
+        
+        # Botão de alternar tema
+        self.tema_btn = QPushButton("🌙 Ativar Tema Escuro")
+        self.tema_btn.setStyleSheet("""
+            QPushButton {
+                padding: 8px;
+                border-radius: 4px;
+                background-color: #f0f0f0;
+            }
+            QPushButton:hover {
+                background-color: #e0e0e0;
+            }
+        """)
+        self.tema_btn.clicked.connect(self.alternar_tema)
+        
+        pref_layout.addWidget(self.tema_btn)
+        pref_group.setLayout(pref_layout)
         
         # Adiciona as seções à coluna esquerda
         left_layout.addWidget(add_group)
         left_layout.addWidget(config_group)
+        left_layout.addWidget(pref_group)
         left_layout.addStretch()
         
         # --- COLUNA DIREITA (70% largura) ---
@@ -245,6 +280,70 @@ class EmailSenderApp(QMainWindow):
         # Carrega configurações
         self.load_config()
 
+    def alternar_tema(self):
+        """Alterna entre tema claro e escuro"""
+        self.dark_mode = not self.dark_mode
+        
+        palette = QPalette()
+        if self.dark_mode:
+            # Configuração do tema escuro
+            palette.setColor(QPalette.ColorRole.Window, QColor(53, 53, 53))
+            palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
+            palette.setColor(QPalette.ColorRole.Base, QColor(25, 25, 25))
+            palette.setColor(QPalette.ColorRole.AlternateBase, QColor(53, 53, 53))
+            palette.setColor(QPalette.ColorRole.ToolTipBase, Qt.GlobalColor.white)
+            palette.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.white)
+            palette.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.white)
+            palette.setColor(QPalette.ColorRole.Button, QColor(53, 53, 53))
+            palette.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.white)
+            palette.setColor(QPalette.ColorRole.BrightText, Qt.GlobalColor.red)
+            palette.setColor(QPalette.ColorRole.Highlight, QColor(142, 45, 197).lighter())
+            palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.white)
+            
+            # Ajusta estilos específicos
+            self.log_text.setStyleSheet("""
+                QTextEdit {
+                    background-color: #2d2d2d;
+                    color: #ffffff;
+                    font-family: Consolas, monospace;
+                    font-size: 10pt;
+                    border: 1px solid #444;
+                }
+            """)
+            self.tema_btn.setText("☀ Ativar Tema Claro")
+        else:
+            # Volta ao tema padrão (claro)
+            palette = QApplication.style().standardPalette()
+            
+            self.log_text.setStyleSheet("""
+            QTextEdit {
+                background-color: #f9f9f9;
+                font-family: Consolas, monospace;
+                font-size: 10pt;
+                border: 1px solid #ddd;
+            }
+        """)
+        self.tema_btn.setText("🌙 Ativar Tema Escuro")
+        
+        # Aplica a paleta global
+        QApplication.instance().setPalette(palette)
+        
+        # Atualiza o texto de todos os grupos
+        for group in self.findChildren(QGroupBox):
+            group.setStyleSheet("""
+                QGroupBox {
+                    font-weight: bold;
+                    border: 1px solid %s;
+                    border-radius: 4px;
+                    margin-top: 10px;
+                    padding-top: 12px;
+                }
+                QGroupBox::title {
+                    subcontrol-origin: margin;
+                    left: 10px;
+                }
+            """ % ("#555" if self.dark_mode else "#aaa"))
+
     def formatar_texto_negrito(self):
         """Adiciona formatação em negrito ao texto selecionado"""
         cursor = self.text_edit.textCursor()
@@ -259,48 +358,9 @@ class EmailSenderApp(QMainWindow):
             # Move o cursor entre as tags
             cursor.movePosition(QTextCursor.MoveOperation.Left, QTextCursor.MoveMode.MoveAnchor, 4)
             self.text_edit.setTextCursor(cursor)
-
-    def selecionar_certificados(self):
-        """Abre o diálogo de arquivos na pasta padrão de certificados"""
-        if not os.path.exists(self.caminho_certificados):
-            self.caminho_certificados = os.path.expanduser("~")  # Vai para a pasta home se o caminho não existir
-            
-        files, _ = QFileDialog.getOpenFileNames(
-            self,
-            "Selecione os Certificados RBC",
-            self.caminho_certificados,
-            "Arquivos PDF (*.pdf);;Todos os arquivos (*)"
-        )
-        
-        if files:
-            self.anexos_selecionados = files
-            self.anexos_label.setText(f"{len(files)} certificado(s) selecionado(s)")
-            self.anexos_label.setStyleSheet("color: #333; font-style: normal;")
-    
-    def selecionar_manual(self):
-        """Adiciona automaticamente o manual fixo aos anexos"""
-        if not os.path.exists(self.caminho_manual):
-            QMessageBox.warning(self, "Manual não encontrado", 
-                              f"O arquivo do manual não foi encontrado no caminho:\n{self.caminho_manual}")
-            return
-            
-        # Se já tiver arquivos selecionados, mantém eles e adiciona o manual
-        current_files = self.anexos_selecionados.copy()
-        
-        # Verifica se o manual já está na lista
-        manual_ja_adicionado = any(self.caminho_manual in f for f in current_files)
-        
-        if not manual_ja_adicionado:
-            current_files.append(self.caminho_manual)
-            self.anexos_selecionados = current_files
-            self.anexos_label.setText(f"{len(current_files)} arquivo(s) (incluindo manual)")
-            self.anexos_label.setStyleSheet("color: #333; font-style: normal;")
-            
-            # Mostra tooltip com o nome do manual
-            manual_nome = os.path.basename(self.caminho_manual)
-            self.anexos_label.setToolTip(f"Manual incluído: {manual_nome}")
     
     def load_config(self):
+        """Carrega configurações de múltiplas fontes"""
         try: 
             config = configparser.ConfigParser() 
             config.read('config.ini') 
@@ -315,21 +375,28 @@ class EmailSenderApp(QMainWindow):
     
     def save_config(self):   
         try: 
+
+            # 1. Tenta carregar do .env
+            load_dotenv()
+
+            # 2. Carrega do config.ini se existir
             config = configparser.ConfigParser() 
-            config['EMAIL'] = {   
-                'servidor_smtp': self.smtp_server.text(),   
-                'porta_smtp': self.smtp_port.text(),   
-                'usuario': self.email_user.text(),   
-                'assunto': self.email_subject.text() 
-            } 
+            if os.path.exists('config.ini'):
+                config.read('config.ini')
+
+            # 3. Configurações Padrão + .env + config.ini
+            self.smtp_server.setText(
+                os.getenv('SMTP_SERVER') or
+                config.get('EMAIL', 'servidor_smtp', fallback=DEFAULT_CONFIG['smtp_server'])
+            )
             
             with open('config.ini', 'w') as configfile:   
                 config.write(configfile) 
             
             self.log("✅ Configurações salvas com sucesso em config.ini")   
+
         except Exception as e: 
-            self.log(f"❌ Erro ao salvar config: {str(e)}") 
-            QMessageBox.critical(self, "Erro", f"Não foi possível salvar as configurações:\n{str(e)}") 
+            self.log(f"❌ Erro ao carregar as configurações: {str(e)}")
     
     def log(self, message):   
         timestamp = time.strftime("%H:%M:%S", time.localtime())   
@@ -337,11 +404,13 @@ class EmailSenderApp(QMainWindow):
         self.log_text.moveCursor(QTextCursor.MoveOperation.End)
     
     def selecionar_arquivos(self):
+        '''Abre diálogo para seleção de arquivos anexos'''
         files, _ = QFileDialog.getOpenFileNames(
             self,
             "Selecione os anexos",
+            self.attachments_dir,
             "",
-            "Arquivos PDF (*.pdf);;Todos os arquivos (*)"
+            "Todos os arquivos (*);;PDF (*.pdf);;Imagens (*.png *.jpg)"
         )
         
         if files:
@@ -356,63 +425,48 @@ class EmailSenderApp(QMainWindow):
     def adicionar_destinatario(self):
         nome = self.nome_entry.text().strip()
         email = self.email_entry.text().strip()
+
+        # Validação básica de e-mail
+        if not "@" in email or "." not in email.split("@")[-1]:
+            QMessageBox.warning(self, "E-mail inválido", "Por favor, insira um endereço de e-mail válido.")
+            return
         
         if not nome or not email:
             QMessageBox.warning(self, "Campos Vazios", "Por favor, preencha o nome e e-mail.")
             return
         
         if not hasattr(self, 'anexos_selecionados') or not self.anexos_selecionados:
-            QMessageBox.warning(self, "Sem Anexos", "Por favor, selecione pelo menos um arquivo.")
-            return
-
-        # Converte todos os caminhos para absolutos e normaliza
-        anexos = [os.path.abspath(f) for f in self.anexos_selecionados]
-        caminho_manual = os.path.abspath(self.caminho_manual)
-
-        # Verifica se o manual está nos anexos (comparação exata de caminhos)
-        manual_incluido = any(os.path.normcase(os.path.abspath(f)) == os.path.normcase(os.path.abspath(self.caminho_manual)) 
-                     for f in self.anexos_selecionados)
-        
-        if not manual_incluido:
             reply = QMessageBox.question(
                 self, 
-                "Manual não incluído", 
-                "O manual de uso não foi selecionado. Deseja adicioná-lo automaticamente?",
+                "Sem Anexos", 
+                "Deseja continuar sem anexos?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
+            if reply == QMessageBox.StandardButton.No:
+                return
             
-            if reply == QMessageBox.StandardButton.Yes:
-                if os.path.exists(caminho_manual):
-                    anexos.append(caminho_manual)
-                else:
-                    QMessageBox.warning(self, "Manual não encontrado", 
-                                    f"Não foi possível adicionar o manual automaticamente.\nArquivo não encontrado em: {caminho_manual}")
-        
-        # Verifica se os arquivos existem
+        # Converte caminhos para absolutos e verifica existência
         arquivos_validos = []
-        for arquivo in anexos:
-            if os.path.exists(arquivo):
-                arquivos_validos.append(arquivo)
+        for arquivo in self.anexos_selecionados:
+            arquivo_abs = os.path.abspath(arquivo)
+            if os.path.exists(arquivo_abs):
+                arquivos_validos.append(arquivo_abs)
             else:
                 QMessageBox.warning(self, "Arquivo não encontrado", 
-                                f"O arquivo não foi encontrado e será ignorado:\n{arquivo}")
-
-        if not arquivos_validos:
-            QMessageBox.warning(self, "Sem Anexos Válidos", "Nenhum arquivo válido para anexar.")
-            return
+                                  f"O arquivo será ignorado (não encontrado):\n{arquivo}")
 
         # Adiciona à árvore (mostra apenas nomes dos arquivos)
-        nomes_arquivos = [os.path.basename(p) for p in arquivos_validos]
+        nomes_arquivos = [os.path.basename(p) for p in arquivos_validos] if arquivos_validos else ["Nenhum anexo"]
         item = QTreeWidgetItem([nome, email, ", ".join(nomes_arquivos)])
         self.tree.addTopLevelItem(item)
         
-        # Armazena os caminhos absolutos validados
+        # Armazena os dados
         self.lista_para_envio.append({
             'nome': nome,
             'email': email,
             'arquivos': arquivos_validos
         })
-
+        
         # Limpa os campos
         self.nome_entry.clear()
         self.email_entry.clear()
@@ -546,6 +600,15 @@ class EmailSenderApp(QMainWindow):
         
         # Carrega template existente se disponível
         if os.path.exists('corpo_email.txt'):
+            template_padrao =  '''Prezado(a) %(nome)s,
+            
+            Segue em anexo os documetnos solicitados.
+            
+            Atenciosamente,
+            Equipe'''
+            with open('corpo_email.txt', 'w', encoding='utf-8') as f:
+                f.write(template_padrao)
+
             with open('corpo_email.txt', 'r', encoding='utf-8') as f:
                 self.text_edit.setPlainText(f.read())
         
